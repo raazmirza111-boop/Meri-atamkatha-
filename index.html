@@ -364,7 +364,324 @@ button:active{
     </div>
 
 
-    <!-- TEXT TO SPEECH -->
+    /* =========================
+   TEXT TO SPEECH - IMPROVED
+========================= */
+
+let currentSpeech = null;
+let availableVoices = [];
+
+
+/* फोन की सभी उपलब्ध voices प्राप्त करें */
+function loadVoices(){
+
+  if(!("speechSynthesis" in window)){
+    return;
+  }
+
+  availableVoices =
+    speechSynthesis.getVoices();
+
+}
+
+
+/* Chrome/Android में voices बाद में भी load हो सकती हैं */
+if("speechSynthesis" in window){
+
+  loadVoices();
+
+  speechSynthesis.onvoiceschanged =
+    function(){
+
+      loadVoices();
+
+    };
+}
+
+
+/* चुनी हुई भाषा के लिए voice खोजें */
+
+function findBestVoice(language){
+
+  if(!availableVoices.length){
+    availableVoices =
+      speechSynthesis.getVoices();
+  }
+
+  const lang =
+    language.toLowerCase();
+
+  /*
+    पहले exact language खोजें
+    जैसे hi-in, en-in, mr-in
+  */
+
+  let voice =
+    availableVoices.find(
+      v =>
+        v.lang.toLowerCase() === lang
+    );
+
+  if(voice){
+    return voice;
+  }
+
+
+  /*
+    फिर केवल language code देखें
+    जैसे hi, en, mr, ur
+  */
+
+  const shortLang =
+    lang.split("-")[0];
+
+  voice =
+    availableVoices.find(
+      v =>
+        v.lang
+          .toLowerCase()
+          .startsWith(shortLang)
+    );
+
+  return voice || null;
+}
+
+
+/* कहानी सुनाना */
+
+function speakStory(){
+
+  const text =
+    document.getElementById("story")
+      .value
+      .trim();
+
+  if(!text){
+
+    alert(
+      "पहले कहानी लिखें या आवाज़ से लिखें।"
+    );
+
+    return;
+  }
+
+  speakTextContent(text);
+}
+
+
+/* अध्याय सुनाना */
+
+function speakText(index){
+
+  const chapter =
+    chapters[index];
+
+  if(!chapter){
+    return;
+  }
+
+  speakTextContent(
+    chapter.title +
+    ". " +
+    chapter.text
+  );
+}
+
+
+/* मुख्य Text-to-Speech function */
+
+function speakTextContent(text){
+
+  if(!("speechSynthesis" in window)){
+
+    alert(
+      "आपके डिवाइस में Text-to-Speech सुविधा उपलब्ध नहीं है।"
+    );
+
+    return;
+  }
+
+
+  const language =
+    document.getElementById(
+      "speechLanguage"
+    ).value;
+
+
+  const rate =
+    parseFloat(
+      document.getElementById(
+        "speechRate"
+      ).value
+    );
+
+
+  /*
+    पहले चल रही आवाज बंद करें
+  */
+
+  speechSynthesis.cancel();
+
+
+  /*
+    थोड़ी देर बाद नई आवाज शुरू करें।
+    Android Chrome में इससे voice
+    loading की समस्या कम होती है।
+  */
+
+  setTimeout(function(){
+
+    loadVoices();
+
+    const voice =
+      findBestVoice(language);
+
+
+    /*
+      अगर चुनी हुई भाषा की voice
+      फोन में उपलब्ध नहीं है
+    */
+
+    if(!voice){
+
+      const languageNames = {
+
+        "hi-IN":"हिंदी",
+        "ur-IN":"उर्दू",
+        "en-IN":"English",
+        "en-US":"English (US)",
+        "ar-SA":"अरबी",
+        "bn-IN":"बंगाली",
+        "mr-IN":"मराठी",
+        "gu-IN":"गुजराती",
+        "pa-IN":"पंजाबी",
+        "ta-IN":"तमिल",
+        "te-IN":"तेलुगु",
+        "kn-IN":"कन्नड़",
+        "ml-IN":"मलयालम"
+
+      };
+
+      const name =
+        languageNames[language] ||
+        language;
+
+      alert(
+        "⚠️ " +
+        name +
+        " की आवाज आपके फोन में उपलब्ध नहीं है।\n\n" +
+        "Android की Text-to-Speech settings में इस भाषा की voice डाउनलोड/इंस्टॉल करें।"
+      );
+
+      return;
+    }
+
+
+    /*
+      नई speech बनाएं
+    */
+
+    const utterance =
+      new SpeechSynthesisUtterance(text);
+
+
+    /*
+      भाषा सेट करें
+    */
+
+    utterance.lang =
+      language;
+
+
+    /*
+      सही voice लगाएं
+    */
+
+    utterance.voice =
+      voice;
+
+
+    /*
+      आवाज की speed
+    */
+
+    utterance.rate =
+      rate;
+
+
+    /*
+      सामान्य pitch
+    */
+
+    utterance.pitch = 1;
+
+
+    currentSpeech =
+      utterance;
+
+
+    /*
+      Speech शुरू
+    */
+
+    speechSynthesis.speak(
+      utterance
+    );
+
+  },150);
+}
+
+
+/* =========================
+   PAUSE
+========================= */
+
+function pauseSpeech(){
+
+  if(
+    "speechSynthesis" in window &&
+    speechSynthesis.speaking
+  ){
+
+    speechSynthesis.pause();
+
+  }
+}
+
+
+/* =========================
+   RESUME
+========================= */
+
+function resumeSpeech(){
+
+  if(
+    "speechSynthesis" in window
+  ){
+
+    speechSynthesis.resume();
+
+  }
+}
+
+
+/* =========================
+   STOP
+========================= */
+
+function stopSpeech(){
+
+  if(
+    "speechSynthesis" in window
+  ){
+
+    speechSynthesis.cancel();
+
+  }
+
+  currentSpeech =
+    null;
+}
 
     <div class="voice-box">
 
