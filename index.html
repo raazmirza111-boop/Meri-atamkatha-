@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>आत्मकथा - लॉगिन</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f6f9;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .auth-card {
+      background: #ffffff;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 360px;
+      text-align: center;
+    }
+    h2 {
+      margin-bottom: 20px;
+      color: #333;
+    }
+    input {
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      box-sizing: border-box;
+      font-size: 16px;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-top: 5px;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .hidden {
+      display: none;
+    }
+    #status-msg {
+      margin-top: 15px;
+      font-size: 14px;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="auth-card">
+    <h2>आत्मकथा</h2>
+
+    <!-- फोन नंबर डालने का सेक्शन -->
+    <div id="phone-section">
+      <input type="tel" id="phone-input" placeholder="10 अंकों का मोबाइल नंबर डालें" maxlength="10">
+      <button id="send-otp-btn">OTP भेजें</button>
+    </div>
+
+    <!-- reCAPTCHA के लिए ज़रूरी डिब्बा -->
+    <div id="recaptcha-container"></div>
+
+    <!-- OTP डालने का सेक्शन (शुरुआत में छुपा रहेगा) -->
+    <div id="otp-section" class="hidden">
+      <input type="text" id="otp-input" placeholder="6 अंकों का OTP दर्ज करें" maxlength="6">
+      <button id="verify-otp-btn">लॉगिन करें</button>
+    </div>
+
+    <div id="status-msg"></div>
+  </div>
+
+  <!-- Firebase Scripts -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+    // आपके प्रोजेक्ट की जानकारी
+    const firebaseConfig = {
+      apiKey: "अपनी_API_KEY_यहाँ_डालें",
+      authDomain: "zeebook-da86f.firebaseapp.com",
+      projectId: "zeebook-da86f",
+      storageBucket: "zeebook-da86f.appspot.com",
+      messagingSenderId: "अपना_SENDER_ID_यहाँ_डालें",
+      appId: "अपना_APP_ID_यहाँ_डालें"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    const statusMsg = document.getElementById("status-msg");
+
+    // reCAPTCHA चालू करना
+    window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+      'size': 'invisible'
+    });
+
+    // 1. OTP भेजने का कोड
+    document.getElementById("send-otp-btn").addEventListener("click", () => {
+      let phone = document.getElementById("phone-input").value.trim();
+
+      if (phone.length < 10) {
+        alert("कृपया सही 10 अंकों का मोबाइल नंबर डालें");
+        return;
+      }
+
+      // नंबर के आगे +91 जोड़ना
+      if (!phone.startsWith("+")) {
+        phone = "+91" + phone;
+      }
+
+      statusMsg.innerText = "OTP भेजा जा रहा है...";
+
+      signInWithPhoneNumber(auth, phone, window.recaptchaVerifier)
+        .then((confirmationResult) => {
+          window.confirmationResult = confirmationResult;
+          statusMsg.innerText = "OTP आपके नंबर पर भेज दिया गया है!";
+          document.getElementById("phone-section").classList.add("hidden");
+          document.getElementById("otp-section").classList.remove("hidden");
+        })
+        .catch((error) => {
+          statusMsg.innerText = "";
+          alert("एरर आया: " + error.message);
+          if (window.recaptchaVerifier) {
+            window.recaptchaVerifier.render().then(widgetId => {
+              grecaptcha.reset(widgetId);
+            });
+          }
+        });
+    });
+
+    // 2. OTP वेरिफाई करने का कोड
+    document.getElementById("verify-otp-btn").addEventListener("click", () => {
+      const otp = document.getElementById("otp-input").value.trim();
+
+      if (otp.length !== 6) {
+        alert("कृपया 6 अंकों का सही OTP डालें");
+        return;
+      }
+
+      statusMsg.innerText = "सत्यापित किया जा रहा है...";
+
+      window.confirmationResult.confirm(otp)
+        .then((result) => {
+          const user = result.user;
+          alert("लॉगिन सफल रहा! स्वागत है " + user.phoneNumber);
+          statusMsg.innerText = "सफल!";
+          // यहाँ लॉगिन के बाद जो पेज खोलना हो, उसका लिंक डाल सकते हैं
+          // window.location.href = "home.html";
+        })
+        .catch((error) => {
+          statusMsg.innerText = "";
+          alert("गलत OTP या एक्सपायर हो गया: " + error.message);
+        });
+    });
+  </script>
+
+</body>
+</html>
