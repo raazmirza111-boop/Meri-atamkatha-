@@ -156,6 +156,8 @@ button.blue{
   display:block;
   cursor:pointer;
   transition:transform 0.2s;
+  position:relative;
+  z-index:1;
 }
 
 .gallery-item img:hover{
@@ -171,6 +173,8 @@ button.blue{
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
+  position:relative;
+  z-index:2;
 }
 
 .gallery-date{
@@ -178,37 +182,61 @@ button.blue{
   color:#777;
   text-align:center;
   padding-bottom:6px;
+  position:relative;
+  z-index:2;
 }
 
+/* BUTTONS ALWAYS ON TOP */
 .gallery-del-btn{
   position:absolute;
-  top:5px;
-  right:5px;
-  background:rgba(176,0,32,0.85);
+  top:8px;
+  right:8px;
+  background:rgba(176,0,32,0.92);
   color:white;
   border-radius:50%;
-  width:28px;
-  height:28px;
+  width:32px;
+  height:32px;
   padding:0;
-  line-height:28px;
-  font-size:12px;
-  border:none;
+  line-height:32px;
+  font-size:14px;
+  border:2px solid #fff;
+  cursor:pointer;
+  z-index:10;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 2px 5px rgba(0,0,0,0.3);
+}
+
+.gallery-del-btn:hover{
+  background:#b00020;
+  transform:scale(1.1);
 }
 
 .gallery-download-btn{
   position:absolute;
-  top:5px;
-  left:5px;
-  background:rgba(13,110,253,0.85);
+  top:8px;
+  left:8px;
+  background:rgba(13,110,253,0.92);
   color:white;
   border-radius:50%;
-  width:28px;
-  height:28px;
+  width:32px;
+  height:32px;
   padding:0;
-  line-height:28px;
-  font-size:13px;
-  border:none;
-  text-align:center;
+  line-height:32px;
+  font-size:14px;
+  border:2px solid #fff;
+  cursor:pointer;
+  z-index:10;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 2px 5px rgba(0,0,0,0.3);
+}
+
+.gallery-download-btn:hover{
+  background:#0d6efd;
+  transform:scale(1.1);
 }
 
 /* Modal View */
@@ -374,7 +402,7 @@ button.blue{
     <button class="secondary" onclick="stopSpeaking()">⏹️ Stop</button>
   </div>
 
-  <!-- ================= GALLERY SECTION (FILE + GOOGLE DRIVE) ================= -->
+  <!-- ================= GALLERY SECTION ================= -->
   <div class="card no-print">
     <h2>📸 Photo Gallery & Memories (Cloud Saved)</h2>
     <p>Upload cherished photos from your computer/mobile OR link them from Google Drive:</p>
@@ -544,7 +572,7 @@ function loadCloudData(){
 }
 
 /* =========================================
-   PHOTO SAVE (DEVICE OR DRIVE LINK)
+   PHOTO SAVE
 ========================================= */
 async function savePhotoToGallery(){
   const captionInput = document.getElementById("photoCaption");
