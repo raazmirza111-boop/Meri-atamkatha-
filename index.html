@@ -148,18 +148,4 @@
 
       statusMsg.innerText = "खाता बनाया जा रहा है...";
 
-      createUserWithEmailAndPassword(auth, email, password)
-        .then((userCredential) => {
-          const user = userCredential.user;
-          alert("नया खाता सफलतापूर्वक बन गया! स्वागत है: " + user.email);
-          statusMsg.innerText = "सफल!";
-        })
-        .catch((error) => {
-          statusMsg.innerText = "";
-          alert("खाता बनाने में समस्या: " + error.message);
-        });
-    });
-  </script>
-
-</body>
-</html>
+      c
