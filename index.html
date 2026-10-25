@@ -93,6 +93,10 @@ button.green{
   background:#287a36;
 }
 
+button.blue{
+  background:#0d6efd;
+}
+
 .hidden{
   display:none !important;
 }
@@ -191,6 +195,22 @@ button.green{
   border:none;
 }
 
+.gallery-download-btn{
+  position:absolute;
+  top:5px;
+  left:5px;
+  background:rgba(13,110,253,0.85);
+  color:white;
+  border-radius:50%;
+  width:28px;
+  height:28px;
+  padding:0;
+  line-height:28px;
+  font-size:13px;
+  border:none;
+  text-align:center;
+}
+
 /* Modal View */
 .modal{
   position:fixed;
@@ -223,6 +243,17 @@ button.green{
 .cover h1{
   font-size:38px;
   color:#7b1e1e;
+}
+
+.upload-switch{
+  display:flex;
+  gap:10px;
+  margin:10px 0;
+}
+
+.upload-switch button{
+  flex:1;
+  margin:0;
 }
 
 @media print{
@@ -343,18 +374,32 @@ button.green{
     <button class="secondary" onclick="stopSpeaking()">⏹️ Stop</button>
   </div>
 
-  <!-- ================= GALLERY SECTION (CLOUD SYNC) ================= -->
+  <!-- ================= GALLERY SECTION (FILE + GOOGLE DRIVE) ================= -->
   <div class="card no-print">
     <h2>📸 Photo Gallery & Memories (Cloud Saved)</h2>
-    <p>Upload your cherished photos permanently. They will be visible on any device automatically:</p>
+    <p>Upload cherished photos from your computer/mobile OR link them from Google Drive:</p>
     
-    <label>Choose Photo:</label>
-    <input type="file" id="photoInput" accept="image/*">
-    
+    <div class="upload-switch">
+      <button class="blue" id="tabDevice" onclick="switchUploadMethod('device')">📁 Upload from Device</button>
+      <button class="secondary" id="tabDrive" onclick="switchUploadMethod('drive')">🌐 Link from Google Drive</button>
+    </div>
+
+    <!-- Mode 1: Device File Upload -->
+    <div id="deviceUploadBox">
+      <label>Choose Photo:</label>
+      <input type="file" id="photoInput" accept="image/*">
+    </div>
+
+    <!-- Mode 2: Google Drive URL -->
+    <div id="driveUploadBox" class="hidden">
+      <label>Google Drive Share Link (Set sharing to "Anyone with the link"):</label>
+      <input type="url" id="driveUrlInput" placeholder="https://drive.google.com/file/d/.../view?usp=sharing">
+    </div>
+
     <input type="text" id="photoCaption" placeholder="Photo caption (e.g., Childhood Memory, School Days)">
     
-    <button class="green" id="uploadPhotoBtn" onclick="uploadPhotoToCloud()">
-      ☁️ Upload to Cloud Gallery
+    <button class="green" id="uploadPhotoBtn" onclick="savePhotoToGallery()">
+      ☁️ Save Photo to Cloud Gallery
     </button>
     <div id="galleryMsg"></div>
 
@@ -379,7 +424,7 @@ button.green{
 
 <script>
 /* =========================================
-   FIREBASE INITIALIZATION (DIRECT CLOUD)
+   FIREBASE INITIALIZATION
 ========================================= */
 const firebaseConfig = {
   apiKey: "AIzaSyB4JlhDVCwjcm_ldwWhH6fuzg2TDPm1X1U",
@@ -398,6 +443,7 @@ const db = firebase.firestore();
 ========================================= */
 let chapters = [];
 let photos = [];
+let uploadMethod = 'device';
 
 let recognition = null;
 let listening = false;
@@ -412,6 +458,32 @@ const galleryContainer = document.getElementById("galleryContainer");
 function escapeHtml(text){
   if(!text) return "";
   return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function switchUploadMethod(method){
+  uploadMethod = method;
+  if(method === 'device'){
+    document.getElementById("deviceUploadBox").classList.remove("hidden");
+    document.getElementById("driveUploadBox").classList.add("hidden");
+    document.getElementById("tabDevice").className = "blue";
+    document.getElementById("tabDrive").className = "secondary";
+  } else {
+    document.getElementById("deviceUploadBox").classList.add("hidden");
+    document.getElementById("driveUploadBox").classList.remove("hidden");
+    document.getElementById("tabDevice").className = "secondary";
+    document.getElementById("tabDrive").className = "blue";
+  }
+}
+
+/* =========================================
+   GOOGLE DRIVE LINK CONVERTER
+========================================= */
+function convertGoogleDriveLink(url){
+  const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+  if(match && match[1]){
+    return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1200`;
+  }
+  return url;
 }
 
 /* =========================================
@@ -447,10 +519,9 @@ function compressImage(file, maxWidth = 1000, quality = 0.75){
 }
 
 /* =========================================
-   LOAD FROM CLOUD (REAL-TIME SYNC)
+   LOAD REAL-TIME CLOUD DATA
 ========================================= */
 function loadCloudData(){
-  // Load Chapters
   db.collection("my_chapters").orderBy("created", "asc").onSnapshot((snapshot) => {
     chapters = [];
     snapshot.forEach((doc) => {
@@ -461,7 +532,6 @@ function loadCloudData(){
     chapterList.innerHTML = `<div class="message error">Could not load chapters: ${err.message}</div>`;
   });
 
-  // Load Photos
   db.collection("my_photos").orderBy("timestamp", "desc").onSnapshot((snapshot) => {
     photos = [];
     snapshot.forEach((doc) => {
@@ -474,41 +544,59 @@ function loadCloudData(){
 }
 
 /* =========================================
-   PHOTO UPLOAD (FIRESTORE CLOUD DIRECT)
+   PHOTO SAVE (DEVICE OR DRIVE LINK)
 ========================================= */
-async function uploadPhotoToCloud(){
-  const fileInput = document.getElementById("photoInput");
+async function savePhotoToGallery(){
   const captionInput = document.getElementById("photoCaption");
   const msg = document.getElementById("galleryMsg");
   const btn = document.getElementById("uploadPhotoBtn");
-
-  if(!fileInput.files || fileInput.files.length === 0){
-    msg.innerHTML = '<div class="message error">Please select a photo first.</div>';
-    return;
-  }
-
-  const file = fileInput.files[0];
+  const caption = captionInput.value.trim() || "Cherished Memory";
 
   try{
     btn.disabled = true;
-    msg.innerHTML = '<div class="message">Compressing and saving to Google Cloud... Please wait.</div>';
 
-    // Compress photo to save space and upload directly to Firestore
-    const compressedBase64 = await compressImage(file, 900, 0.7);
+    if(uploadMethod === 'device'){
+      const fileInput = document.getElementById("photoInput");
+      if(!fileInput.files || fileInput.files.length === 0){
+        msg.innerHTML = '<div class="message error">Please choose an image file first.</div>';
+        btn.disabled = false;
+        return;
+      }
+      msg.innerHTML = '<div class="message">Compressing and saving to Google Cloud...</div>';
+      const compressedBase64 = await compressImage(fileInput.files[0], 900, 0.7);
 
-    await db.collection("my_photos").add({
-      image: compressedBase64,
-      caption: captionInput.value.trim() || "Cherished Memory",
-      date: new Date().toLocaleDateString(),
-      timestamp: Date.now()
-    });
+      await db.collection("my_photos").add({
+        image: compressedBase64,
+        caption: caption,
+        date: new Date().toLocaleDateString(),
+        timestamp: Date.now()
+      });
+      fileInput.value = "";
+    } else {
+      const driveUrlInput = document.getElementById("driveUrlInput");
+      const rawUrl = driveUrlInput.value.trim();
+      if(!rawUrl){
+        msg.innerHTML = '<div class="message error">Please enter a Google Drive share link.</div>';
+        btn.disabled = false;
+        return;
+      }
+      const directImageUrl = convertGoogleDriveLink(rawUrl);
 
-    fileInput.value = "";
+      await db.collection("my_photos").add({
+        image: directImageUrl,
+        caption: caption,
+        date: new Date().toLocaleDateString(),
+        timestamp: Date.now(),
+        isDriveLink: true
+      });
+      driveUrlInput.value = "";
+    }
+
     captionInput.value = "";
-    msg.innerHTML = '<div class="message success">Photo permanently saved to Cloud! Visible on all your devices.</div>';
+    msg.innerHTML = '<div class="message success">Photo saved to Cloud! Visible on all devices.</div>';
     setTimeout(() => { msg.innerHTML = ""; }, 4000);
   }catch(err){
-    msg.innerHTML = `<div class="message error">Upload failed: ${err.message}</div>`;
+    msg.innerHTML = `<div class="message error">Save failed: ${err.message}</div>`;
   }finally{
     btn.disabled = false;
   }
@@ -522,12 +610,23 @@ function renderPhotos(list){
 
   galleryContainer.innerHTML = list.map(item => `
     <div class="gallery-item">
+      <button class="gallery-download-btn" title="Download Photo" onclick="downloadSinglePhoto('${item.image}', '${escapeHtml(item.caption)}')">⬇️</button>
       <button class="gallery-del-btn" title="Delete Photo" onclick="deletePhotoFromCloud('${item.id}')">✕</button>
       <img src="${item.image}" alt="${escapeHtml(item.caption)}" onclick="openModal('${item.image}')">
       <div class="gallery-caption">${escapeHtml(item.caption)}</div>
       <div class="gallery-date">${item.date}</div>
     </div>
   `).join("");
+}
+
+function downloadSinglePhoto(imageUrl, caption){
+  const a = document.createElement("a");
+  a.href = imageUrl;
+  a.download = (caption ? caption.replace(/[^a-zA-Z0-9]/g, "_") : "photo") + ".jpg";
+  a.target = "_blank";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 async function deletePhotoFromCloud(docId){
@@ -549,7 +648,7 @@ function closeModal(){
 }
 
 /* =========================================
-   CHAPTERS LOGIC (FIRESTORE CLOUD)
+   CHAPTERS LOGIC
 ========================================= */
 async function saveChapter(){
   const title = chapterTitle.value.trim();
