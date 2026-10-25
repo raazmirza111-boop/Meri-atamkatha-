@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>मेरी आत्मकथा</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background-color: #f0f2f5;
+      color: #333;
+      padding: 20px;
+    }
+    .app-container {
+      max-width: 700px;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    }
+    header {
+      border-bottom: 2px solid #eef0f3;
+      padding-bottom: 15px;
+      margin-bottom: 25px;
+      text-align: center;
+    }
+    header h1 {
+      color: #1a73e8;
+      font-size: 28px;
+    }
+    header p {
+      color: #666;
+      font-size: 14px;
+      margin-top: 5px;
+    }
+    .editor-section {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      margin-bottom: 30px;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 12px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      outline: none;
+    }
+    input[type="text"]:focus, textarea:focus {
+      border-color: #1a73e8;
+    }
+    textarea {
+      width: 100%;
+      height: 150px;
+      padding: 12px;
+      font-size: 15px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      resize: vertical;
+      outline: none;
+      font-family: inherit;
+    }
+    .btn-save {
+      background-color: #1a73e8;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      font-size: 16px;
+      font-weight: bold;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-save:hover {
+      background-color: #1558b0;
+    }
+    .entries-section h2 {
+      font-size: 20px;
+      margin-bottom: 15px;
+      color: #444;
+    }
+    .entry-card {
+      background: #fdfdfd;
+      border-left: 4px solid #1a73e8;
+      border: 1px solid #e2e8f0;
+      border-left-width: 4px;
+      border-radius: 6px;
+      padding: 15px;
+      margin-bottom: 12px;
+    }
+    .entry-title {
+      font-size: 18px;
+      font-weight: bold;
+      color: #222;
+      margin-bottom: 4px;
+    }
+    .entry-date {
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 10px;
+    }
+    .entry-text {
+      font-size: 15px;
+      line-height: 1.6;
+      color: #444;
+      white-space: pre-wrap;
+    }
+    .delete-btn {
+      color: #d93025;
+      background: none;
+      border: none;
+      font-size: 13px;
+      cursor: pointer;
+      margin-top: 10px;
+      padding: 0;
+      text-decoration: underline;
+    }
+    .empty-msg {
+      text-align: center;
+      color: #888;
+      font-style: italic;
+      padding: 20px 0;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-container">
+    <header>
+      <h1>मेरी आत्मकथा</h1>
+      <p>सीधा एक्सेस — अपने जीवन के संस्मरण यहाँ दर्ज करें</p>
+    </header>
+
+    <!-- नई प्रविष्टि लिखने का सेक्शन -->
+    <div class="editor-section">
+      <input type="text" id="entry-title" placeholder="शीर्षक (उदा. बचपन की एक याद)...">
+      <textarea id="entry-content" placeholder="अपने विचार, संस्मरण या आज की कहानी लिखें..."></textarea>
+      <button class="btn-save" id="save-btn">डायरी में सुरक्षित करें</button>
+    </div>
+
+    <!-- पुरानी प्रविष्टियों की सूची -->
+    <div class="entries-section">
+      <h2>सहेजे गए संस्मरण</h2>
+      <div id="entries-list"></div>
+    </div>
+  </div>
+
+  <script>
+    const titleInput = document.getElementById('entry-title');
+    const contentInput = document.getElementById('entry-content');
+    const saveBtn = document.getElementById('save-btn');
+    const entriesList = document.getElementById('entries-list');
+
+    // 1. लोकल स्टोरेज से डेटा लोड करने का फ़ंक्शन
+    function loadEntries() {
+      const savedEntries = JSON.parse(localStorage.getItem('my_autobiography_entries') || '[]');
+      entriesList.innerHTML = '';
+
+      if (savedEntries.length === 0) {
+        entriesList.innerHTML = '<p class="empty-msg">अभी तक कोई संस्मरण नहीं लिखा गया है। ऊपर लिखकर सुरक्षित करें।</p>';
+        return;
+      }
+
+      savedEntries.forEach((entry, index) => {
+        const card = document.createElement('div');
+        card.className = 'entry-card';
+        card.innerHTML = `
+          <div class="entry-title">${entry.title}</div>
+          <div class="entry-date">${entry.date}</div>
+          <div class="entry-text">${entry.content}</div>
+          <button class="delete-btn" onclick="deleteEntry(${index})">हटाएँ</button>
+        `;
+        entriesList.appendChild(card);
+      });
+    }
+
+    // 2. नया संस्मरण सुरक्षित करने का फ़ंक्शन
+    saveBtn.addEventListener('click', () => {
+      const title = titleInput.value.trim();
+      const content = contentInput.value.trim();
+
+      if (!title || !content) {
+        alert('कृपया शीर्षक और सामग्री दोनों भरें।');
+        return;
+      }
+
+      const newEntry = {
+        title: title,
+        content: content,
+        date: new Date().toLocaleString('hi-IN')
+      };
+
+      const entries = JSON.parse(localStorage.getItem('my_autobiography_entries') || '[]');
+      entries.unshift(newEntry);
+      localStorage.setItem('my_autobiography_entries', JSON.stringify(entries));
+
+      titleInput.value = '';
+      contentInput.value = '';
+      loadEntries();
+    });
+
+    // 3. संस्मरण हटाने का फ़ंक्शन
+    window.deleteEntry = function(index) {
+      if (confirm('क्या आप इसे हटाना चाहते हैं?')) {
+        const entries = JSON.parse(localStorage.getItem('my_autobiography_entries') || '[]');
+        entries.splice(index, 1);
+        localStorage.setItem('my_autobiography_entries', JSON.stringify(entries));
+        loadEntries();
+      }
+    };
+
+    // पेज खुलते ही डेटा लोड करें
+    loadEntries();
+  </script>
+
+</body>
+</html>
