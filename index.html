@@ -191,7 +191,7 @@ button.green{
   border:none;
 }
 
-/* Fullscreen Photo Modal */
+/* Modal View */
 .modal{
   position:fixed;
   top:0;
@@ -235,6 +235,10 @@ button.green{
   @page{size:A4; margin:18mm;}
 }
 </style>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 </head>
 
 <body>
@@ -270,8 +274,8 @@ button.green{
       placeholder="Write your story here or use the microphone below..."
     ></textarea>
 
-    <button class="green" onclick="saveChapter()">
-      💾 Save Chapter
+    <button class="green" id="saveChapterBtn" onclick="saveChapter()">
+      💾 Save Chapter (Cloud)
     </button>
     <button class="secondary" onclick="clearEditor()">
       🧹 Clear
@@ -297,7 +301,7 @@ button.green{
   <!-- CHAPTER LIST -->
   <div class="card no-print">
     <h2>📚 My Chapters</h2>
-    <div id="chapterList">Loading chapters...</div>
+    <div id="chapterList">Loading chapters from Cloud...</div>
   </div>
 
   <!-- BOOK VIEW -->
@@ -339,35 +343,31 @@ button.green{
     <button class="secondary" onclick="stopSpeaking()">⏹️ Stop</button>
   </div>
 
-  <!-- ================= GALLERY SECTION (MOVED TO BOTTOM) ================= -->
+  <!-- ================= GALLERY SECTION (CLOUD SYNC) ================= -->
   <div class="card no-print">
-    <h2>📸 Photo Gallery & Memories</h2>
-    <p>Upload and preserve your vintage and cherished photos permanently:</p>
+    <h2>📸 Photo Gallery & Memories (Cloud Saved)</h2>
+    <p>Upload your cherished photos permanently. They will be visible on any device automatically:</p>
     
     <label>Choose Photo:</label>
     <input type="file" id="photoInput" accept="image/*">
     
     <input type="text" id="photoCaption" placeholder="Photo caption (e.g., Childhood Memory, School Days)">
     
-    <button class="green" onclick="addPhoto()">
-      ➕ Save Photo to Gallery
+    <button class="green" id="uploadPhotoBtn" onclick="uploadPhotoToCloud()">
+      ☁️ Upload to Cloud Gallery
     </button>
     <div id="galleryMsg"></div>
 
     <div class="gallery-grid" id="galleryContainer">
-      <!-- Gallery photos display here -->
+      Loading photos from Cloud...
     </div>
   </div>
 
   <!-- BACKUP & RESTORE -->
   <div class="card no-print">
-    <h2>💾 Full Backup & Restore (Photos + Stories)</h2>
-    <p>Download a complete backup file of your entire autobiography and all photos to keep safely on your PC or flash drive:</p>
-    <button onclick="downloadFullBackup()">⬇️ Download Full Backup</button>
-    <br><br>
-    <label>Restore from Backup File:</label>
-    <input id="restoreFile" type="file" accept=".json,application/json" onchange="restoreFullBackup(event)">
-    <div id="backupMessage"></div>
+    <h2>💾 Offline Backup (JSON)</h2>
+    <p>Download an extra copy of all your cloud data on your PC or flash drive:</p>
+    <button onclick="downloadFullBackup()">⬇️ Download Offline Backup</button>
   </div>
 
 </div>
@@ -379,33 +379,19 @@ button.green{
 
 <script>
 /* =========================================
-   INDEXED-DB FOR PERMANENT STORAGE
+   FIREBASE INITIALIZATION (DIRECT CLOUD)
 ========================================= */
-let db;
-const DB_NAME = "MeriAtmakathaDB";
-const DB_VERSION = 1;
+const firebaseConfig = {
+  apiKey: "AIzaSyB4JlhDVCwjcm_ldwWhH6fuzg2TDPm1X1U",
+  authDomain: "zeebook-da861.firebaseapp.com",
+  projectId: "zeebook-da861",
+  storageBucket: "zeebook-da861.firebasestorage.app",
+  messagingSenderId: "822256925023",
+  appId: "1:822256925023:web:2ca7a0c80ededce26a9eea"
+};
 
-function initDB(){
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onupgradeneeded = function(e){
-      const database = e.target.result;
-      if(!database.objectStoreNames.contains("chapters")){
-        database.createObjectStore("chapters", { keyPath: "id" });
-      }
-      if(!database.objectStoreNames.contains("photos")){
-        database.createObjectStore("photos", { keyPath: "id" });
-      }
-    };
-    request.onsuccess = function(e){
-      db = e.target.result;
-      resolve(db);
-    };
-    request.onerror = function(e){
-      reject(e);
-    };
-  });
-}
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
 
 /* =========================================
    GLOBAL STATE
@@ -429,41 +415,72 @@ function escapeHtml(text){
 }
 
 /* =========================================
-   LOAD DATA
+   IMAGE COMPRESSION HELPER
 ========================================= */
-async function loadAllData(){
-  await initDB();
-  loadChaptersFromDB();
-  loadPhotosFromDB();
-}
+function compressImage(file, maxWidth = 1000, quality = 0.75){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = function(event){
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = function(){
+        const elem = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
 
-function loadChaptersFromDB(){
-  const tx = db.transaction("chapters", "readonly");
-  const store = tx.objectStore("chapters");
-  const req = store.getAll();
-  req.onsuccess = function(){
-    chapters = req.result || [];
-    renderChapters(chapters);
-  };
-}
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
 
-function loadPhotosFromDB(){
-  const tx = db.transaction("photos", "readonly");
-  const store = tx.objectStore("photos");
-  const req = store.getAll();
-  req.onsuccess = function(){
-    photos = req.result || [];
-    renderPhotos(photos);
-  };
+        elem.width = width;
+        elem.height = height;
+        const ctx = elem.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(elem.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = (err) => reject(err);
+    };
+    reader.onerror = (err) => reject(err);
+  });
 }
 
 /* =========================================
-   PHOTO GALLERY LOGIC
+   LOAD FROM CLOUD (REAL-TIME SYNC)
 ========================================= */
-function addPhoto(){
+function loadCloudData(){
+  // Load Chapters
+  db.collection("my_chapters").orderBy("created", "asc").onSnapshot((snapshot) => {
+    chapters = [];
+    snapshot.forEach((doc) => {
+      chapters.push({ id: doc.id, ...doc.data() });
+    });
+    renderChapters(chapters);
+  }, (err) => {
+    chapterList.innerHTML = `<div class="message error">Could not load chapters: ${err.message}</div>`;
+  });
+
+  // Load Photos
+  db.collection("my_photos").orderBy("timestamp", "desc").onSnapshot((snapshot) => {
+    photos = [];
+    snapshot.forEach((doc) => {
+      photos.push({ id: doc.id, ...doc.data() });
+    });
+    renderPhotos(photos);
+  }, (err) => {
+    galleryContainer.innerHTML = `<div class="message error">Could not load photos: ${err.message}</div>`;
+  });
+}
+
+/* =========================================
+   PHOTO UPLOAD (FIRESTORE CLOUD DIRECT)
+========================================= */
+async function uploadPhotoToCloud(){
   const fileInput = document.getElementById("photoInput");
   const captionInput = document.getElementById("photoCaption");
   const msg = document.getElementById("galleryMsg");
+  const btn = document.getElementById("uploadPhotoBtn");
 
   if(!fileInput.files || fileInput.files.length === 0){
     msg.innerHTML = '<div class="message error">Please select a photo first.</div>';
@@ -471,56 +488,55 @@ function addPhoto(){
   }
 
   const file = fileInput.files[0];
-  const reader = new FileReader();
 
-  reader.onload = function(e){
-    const base64Data = e.target.result;
-    const newPhoto = {
-      id: "photo_" + Date.now(),
-      data: base64Data,
+  try{
+    btn.disabled = true;
+    msg.innerHTML = '<div class="message">Compressing and saving to Google Cloud... Please wait.</div>';
+
+    // Compress photo to save space and upload directly to Firestore
+    const compressedBase64 = await compressImage(file, 900, 0.7);
+
+    await db.collection("my_photos").add({
+      image: compressedBase64,
       caption: captionInput.value.trim() || "Cherished Memory",
-      date: new Date().toLocaleDateString()
-    };
+      date: new Date().toLocaleDateString(),
+      timestamp: Date.now()
+    });
 
-    const tx = db.transaction("photos", "readwrite");
-    const store = tx.objectStore("photos");
-    store.add(newPhoto);
-
-    tx.oncomplete = function(){
-      fileInput.value = "";
-      captionInput.value = "";
-      msg.innerHTML = '<div class="message success">Photo saved to gallery successfully!</div>';
-      setTimeout(() => { msg.innerHTML = ""; }, 3000);
-      loadPhotosFromDB();
-    };
-  };
-
-  reader.readAsDataURL(file);
+    fileInput.value = "";
+    captionInput.value = "";
+    msg.innerHTML = '<div class="message success">Photo permanently saved to Cloud! Visible on all your devices.</div>';
+    setTimeout(() => { msg.innerHTML = ""; }, 4000);
+  }catch(err){
+    msg.innerHTML = `<div class="message error">Upload failed: ${err.message}</div>`;
+  }finally{
+    btn.disabled = false;
+  }
 }
 
 function renderPhotos(list){
   if(!list || list.length === 0){
-    galleryContainer.innerHTML = '<p style="color:#777;grid-column:1/-1;">No photos in the gallery yet.</p>';
+    galleryContainer.innerHTML = '<p style="color:#777;grid-column:1/-1;">No photos in Cloud gallery yet.</p>';
     return;
   }
 
   galleryContainer.innerHTML = list.map(item => `
     <div class="gallery-item">
-      <button class="gallery-del-btn" title="Delete Photo" onclick="deletePhoto('${item.id}')">✕</button>
-      <img src="${item.data}" alt="${escapeHtml(item.caption)}" onclick="openModal('${item.data}')">
+      <button class="gallery-del-btn" title="Delete Photo" onclick="deletePhotoFromCloud('${item.id}')">✕</button>
+      <img src="${item.image}" alt="${escapeHtml(item.caption)}" onclick="openModal('${item.image}')">
       <div class="gallery-caption">${escapeHtml(item.caption)}</div>
       <div class="gallery-date">${item.date}</div>
     </div>
   `).join("");
 }
 
-function deletePhoto(id){
-  if(!confirm("Are you sure you want to delete this photo?")) return;
-  const tx = db.transaction("photos", "readwrite");
-  tx.objectStore("photos").delete(id);
-  tx.oncomplete = function(){
-    loadPhotosFromDB();
-  };
+async function deletePhotoFromCloud(docId){
+  if(!confirm("Are you sure you want to permanently delete this photo from Cloud?")) return;
+  try{
+    await db.collection("my_photos").doc(docId).delete();
+  }catch(err){
+    alert("Delete failed: " + err.message);
+  }
 }
 
 function openModal(imgSrc){
@@ -533,12 +549,13 @@ function closeModal(){
 }
 
 /* =========================================
-   CHAPTERS LOGIC
+   CHAPTERS LOGIC (FIRESTORE CLOUD)
 ========================================= */
-function saveChapter(){
+async function saveChapter(){
   const title = chapterTitle.value.trim();
   const story = storyText.value.trim();
   const msg = document.getElementById("saveMessage");
+  const btn = document.getElementById("saveChapterBtn");
 
   if(!title || !story){
     msg.innerHTML = '<div class="message error">Please enter both a title and the story.</div>';
@@ -546,33 +563,31 @@ function saveChapter(){
   }
 
   const editId = editingId.value.trim();
-  const tx = db.transaction("chapters", "readwrite");
-  const store = tx.objectStore("chapters");
+  btn.disabled = true;
 
-  if(editId){
-    const index = chapters.findIndex(c => c.id === editId);
-    if(index !== -1){
-      chapters[index].title = title;
-      chapters[index].story = story;
-      chapters[index].updated = new Date().toISOString();
-      store.put(chapters[index]);
+  try{
+    if(editId){
+      await db.collection("my_chapters").doc(editId).update({
+        title: title,
+        story: story,
+        updated: new Date().toISOString()
+      });
+      msg.innerHTML = '<div class="message success">Chapter updated on Cloud!</div>';
+    }else{
+      await db.collection("my_chapters").add({
+        title: title,
+        story: story,
+        created: new Date().toISOString()
+      });
+      msg.innerHTML = '<div class="message success">Chapter permanently saved to Cloud!</div>';
     }
-  }else{
-    const newChapter = {
-      id: "ch_" + Date.now(),
-      title: title,
-      story: story,
-      created: new Date().toISOString()
-    };
-    store.add(newChapter);
-  }
-
-  tx.oncomplete = function(){
     clearEditor();
-    msg.innerHTML = '<div class="message success">Chapter saved successfully!</div>';
     setTimeout(() => { msg.innerHTML = ""; }, 3000);
-    loadChaptersFromDB();
-  };
+  }catch(err){
+    msg.innerHTML = `<div class="message error">Error: ${err.message}</div>`;
+  }finally{
+    btn.disabled = false;
+  }
 }
 
 function renderChapters(list){
@@ -608,11 +623,13 @@ function editChapter(id){
   window.scrollTo({ top: chapterTitle.offsetTop - 50, behavior: "smooth" });
 }
 
-function deleteChapter(id){
-  if(!confirm("Are you sure you want to delete this chapter?")) return;
-  const tx = db.transaction("chapters", "readwrite");
-  tx.objectStore("chapters").delete(id);
-  tx.oncomplete = () => loadChaptersFromDB();
+async function deleteChapter(id){
+  if(!confirm("Are you sure you want to delete this chapter from Cloud?")) return;
+  try{
+    await db.collection("my_chapters").doc(id).delete();
+  }catch(err){
+    alert("Delete error: " + err.message);
+  }
 }
 
 function searchChapters(){
@@ -719,7 +736,7 @@ function stopSpeaking(){
 }
 
 /* =========================================
-   FULL BACKUP & RESTORE
+   OFFLINE BACKUP
 ========================================= */
 function downloadFullBackup(){
   const fullData = {
@@ -730,47 +747,16 @@ function downloadFullBackup(){
   const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(fullData));
   const dlAnchor = document.createElement('a');
   dlAnchor.setAttribute("href", dataStr);
-  dlAnchor.setAttribute("download", "My_Autobiography_Full_Backup.json");
+  dlAnchor.setAttribute("download", "My_Autobiography_Cloud_Backup.json");
   dlAnchor.click();
-}
-
-function restoreFullBackup(event){
-  const file = event.target.files[0];
-  const msg = document.getElementById("backupMessage");
-  if(!file) return;
-
-  const reader = new FileReader();
-  reader.onload = async function(e){
-    try{
-      const imported = JSON.parse(e.target.result);
-      if(imported.chapters || imported.photos){
-        const txCh = db.transaction("chapters", "readwrite");
-        const storeCh = txCh.objectStore("chapters");
-        storeCh.clear();
-        (imported.chapters || []).forEach(c => storeCh.add(c));
-
-        const txPh = db.transaction("photos", "readwrite");
-        const storePh = txPh.objectStore("photos");
-        storePh.clear();
-        (imported.photos || []).forEach(p => storePh.add(p));
-
-        msg.innerHTML = '<div class="message success">Full backup (stories + photos) restored successfully!</div>';
-        setTimeout(() => { location.reload(); }, 1500);
-      } else {
-        throw new Error("Invalid backup file format.");
-      }
-    }catch(err){
-      msg.innerHTML = '<div class="message error">Failed to load file: ' + err.message + '</div>';
-    }
-  };
-  reader.readAsText(file);
 }
 
 document.getElementById("ttsSpeed").addEventListener("input", function(){
   document.getElementById("speedValue").textContent = Number(this.value).toFixed(1);
 });
 
-window.addEventListener("DOMContentLoaded", loadAllData);
+// Load real-time cloud data on start
+window.addEventListener("DOMContentLoaded", loadCloudData);
 </script>
 
 </body>
