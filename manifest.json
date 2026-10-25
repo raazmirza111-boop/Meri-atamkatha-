@@ -1,0 +1,16 @@
+{
+  "name": "Meri Atmakatha",
+  "short_name": "Atmakatha",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#5c1111",
+  "theme_color": "#5c1111",
+  "icons": [
+    {
+      "src": "logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
