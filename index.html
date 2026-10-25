@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#7b1e1e">
-<title>मेरी आत्मकथा - मेरी जिंदगी की किताब</title>
+<title>मेरी आत्मकथा - मेरी जिंदगी की किताब व फोटो गैलरी</title>
 
 <style>
 *{box-sizing:border-box}
@@ -61,7 +61,7 @@ input,textarea,select{
 }
 
 textarea{
-  min-height:220px;
+  min-height:200px;
   resize:vertical;
   line-height:1.7;
 }
@@ -123,13 +123,93 @@ button.green{
   background:#fff;
 }
 
-.chapter h3{
-  margin-top:0;
-}
-
 .story-preview{
   white-space:pre-wrap;
   line-height:1.7;
+}
+
+/* ================= GALLERY CSS ================= */
+.gallery-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(180px, 1fr));
+  gap:15px;
+  margin-top:15px;
+}
+
+.gallery-item{
+  position:relative;
+  border:1px solid #ddd;
+  border-radius:10px;
+  overflow:hidden;
+  background:#fafafa;
+  box-shadow:0 2px 6px rgba(0,0,0,0.06);
+}
+
+.gallery-item img{
+  width:100%;
+  height:160px;
+  object-fit:cover;
+  display:block;
+  cursor:pointer;
+  transition:transform 0.2s;
+}
+
+.gallery-item img:hover{
+  transform:scale(1.03);
+}
+
+.gallery-caption{
+  padding:8px 10px;
+  font-size:14px;
+  font-weight:bold;
+  color:#333;
+  text-align:center;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.gallery-date{
+  font-size:11px;
+  color:#777;
+  text-align:center;
+  padding-bottom:6px;
+}
+
+.gallery-del-btn{
+  position:absolute;
+  top:5px;
+  right:5px;
+  background:rgba(176,0,32,0.85);
+  color:white;
+  border-radius:50%;
+  width:28px;
+  height:28px;
+  padding:0;
+  line-height:28px;
+  font-size:12px;
+  border:none;
+}
+
+/* Modal View */
+.modal{
+  position:fixed;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+  background:rgba(0,0,0,0.85);
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  z-index:9999;
+}
+
+.modal img{
+  max-width:90%;
+  max-height:85%;
+  border-radius:8px;
+  box-shadow:0 0 20px rgba(255,255,255,0.2);
 }
 
 .cover{
@@ -145,51 +225,14 @@ button.green{
   color:#7b1e1e;
 }
 
-.cover h2{
-  font-size:25px;
-  color:#333;
-}
-
-.cover p{
-  font-size:19px;
-}
-
-.status{
-  font-size:14px;
-  color:#555;
-}
-
 @media print{
-  body{
-    background:white;
-  }
-
-  header,
-  .no-print{
-    display:none !important;
-  }
-
-  .container{
-    max-width:none;
-    padding:0;
-  }
-
-  .card{
-    box-shadow:none;
-  }
-
-  .chapter{
-    page-break-inside:avoid;
-  }
-
-  .cover{
-    page-break-after:always;
-  }
-
-  @page{
-    size:A4;
-    margin:18mm;
-  }
+  body{background:white;}
+  header, .no-print{display:none !important;}
+  .container{max-width:none; padding:0;}
+  .card{box-shadow:none;}
+  .chapter{page-break-inside:avoid;}
+  .cover{page-break-after:always;}
+  @page{size:A4; margin:18mm;}
 }
 </style>
 </head>
@@ -198,12 +241,32 @@ button.green{
 
 <header>
   <h1>मेरी आत्मकथा</h1>
-  <p>मेरी जिंदगी की किताब</p>
+  <p>मेरी जिंदगी की किताब व संस्मरण</p>
 </header>
 
 <div class="container">
 
-  <!-- SEARCH -->
+  <!-- ================= GALLERY SECTION ================= -->
+  <div class="card no-print">
+    <h2>📸 यादों की गैलरी (तस्वीरें)</h2>
+    <p>अपनी पुरानी और यादगार तस्वीरें यहाँ सुरक्षित जोड़ें:</p>
+    
+    <label>फ़ोटो चुनें:</label>
+    <input type="file" id="photoInput" accept="image/*">
+    
+    <input type="text" id="photoCaption" placeholder="फ़ोटो के बारे में लिखें (उदा. बचपन की याद, स्कूल के दिन)">
+    
+    <button class="green" onclick="addPhoto()">
+      ➕ गैलरी में फ़ोटो सेव करें
+    </button>
+    <div id="galleryMsg"></div>
+
+    <div class="gallery-grid" id="galleryContainer">
+      <!-- Photos will appear here -->
+    </div>
+  </div>
+
+  <!-- SEARCH CHAPTERS -->
   <div class="card no-print">
     <h3>🔎 अध्याय खोजें</h3>
     <input
@@ -241,43 +304,28 @@ button.green{
   <!-- VOICE TO TEXT -->
   <div class="card no-print">
     <h2>🎤 आवाज़ से लिखें</h2>
-    <p>
-      माइक्रोफोन दबाकर लगातार बोलें। काम पूरा होने पर <b>रोकें</b> दबाएँ।
-    </p>
-    <button
-      class="green"
-      id="startVoiceBtn"
-      onclick="startVoice()"
-    >
+    <p>माइक्रोफोन दबाकर लगातार बोलें। पूरा होने पर <b>रोकें</b> दबाएँ।</p>
+    <button class="green" id="startVoiceBtn" onclick="startVoice()">
       🎤 बोलना शुरू करें
     </button>
-    <button
-      class="danger"
-      id="stopVoiceBtn"
-      onclick="stopVoice()"
-      disabled
-    >
+    <button class="danger" id="stopVoiceBtn" onclick="stopVoice()" disabled>
       ⏹️ बोलना रोकें
     </button>
-    <div id="voiceStatus" class="status">
-      माइक्रोफोन बंद है।
-    </div>
+    <div id="voiceStatus" style="font-size:14px;color:#555;margin-top:6px;">माइक्रोफोन बंद है।</div>
   </div>
 
   <!-- CHAPTER LIST -->
   <div class="card no-print">
     <h2>📚 मेरे अध्याय</h2>
-    <div id="chapterList">
-      अध्याय लोड हो रहे हैं...
-    </div>
+    <div id="chapterList">अध्याय लोड हो रहे हैं...</div>
   </div>
 
-  <!-- BOOK VIEW / MODAL -->
+  <!-- BOOK VIEW -->
   <div id="bookContainer" class="hidden">
     <div class="cover">
       <h1>मेरी आत्मकथा</h1>
       <h2>मेरी जिंदगी की किताब</h2>
-      <p>लेखक के संस्मरण</p>
+      <p>जीवन संस्मरण व संकलन</p>
     </div>
     <div id="bookChapters"></div>
   </div>
@@ -285,12 +333,8 @@ button.green{
   <!-- BOOK BUTTONS -->
   <div class="card no-print">
     <h2>📕 किताब</h2>
-    <button onclick="showBook()">
-      📕 पूरी किताब खोलें / बंद करें
-    </button>
-    <button onclick="printBook()">
-      🖨️ PDF / प्रिंट
-    </button>
+    <button onclick="showBook()">📕 पूरी किताब खोलें / बंद करें</button>
+    <button onclick="printBook()">🖨️ PDF / प्रिंट</button>
   </div>
 
   <!-- TEXT TO SPEECH -->
@@ -308,119 +352,204 @@ button.green{
     </select>
 
     <label>बोलने की गति</label>
-    <input
-      id="ttsSpeed"
-      type="range"
-      min="0.6"
-      max="1.4"
-      value="1"
-      step="0.1"
-    >
-    <div>
-      गति: <span id="speedValue">1.0</span>
-    </div>
+    <input id="ttsSpeed" type="range" min="0.6" max="1.4" value="1" step="0.1">
+    <div>गति: <span id="speedValue">1.0</span></div>
 
-    <button onclick="speakStory()">
-      🔊 सुनाएँ
-    </button>
-    <button class="secondary" onclick="stopSpeaking()">
-      ⏹️ रोकें
-    </button>
+    <button onclick="speakStory()">🔊 सुनाएँ</button>
+    <button class="secondary" onclick="stopSpeaking()">⏹️ रोकें</button>
   </div>
 
-  <!-- BACKUP -->
+  <!-- BACKUP & RESTORE -->
   <div class="card no-print">
-    <h2>💾 बैकअप</h2>
-    <p>
-      यह बैकअप आपकी लिखी हुई आत्मकथा/अध्यायों का है। इसे डाउनलोड करके सुरक्षित रख सकते हैं।
-    </p>
-    <button onclick="downloadBackup()">
-      ⬇️ Backup JSON डाउनलोड करें
-    </button>
+    <h2>💾 संपूर्ण बैकअप (तस्वीरें + कहानियाँ)</h2>
+    <p>अपनी पूरी आत्मकथा और सभी तस्वीरों की बैकअप फ़ाइल डाउनलोड करके कंप्यूटर या पेनड्राइव में रख लें:</p>
+    <button onclick="downloadFullBackup()">⬇️ Full Backup डाउनलोड करें</button>
     <br><br>
-    <label>पुराना बैकअप फ़ाइल से लोड करें:</label>
-    <input
-      id="restoreFile"
-      type="file"
-      accept=".json,application/json"
-      onchange="restoreBackup(event)"
-    >
+    <label>पुराना बैकअप फ़ाइल से वापस लोड करें:</label>
+    <input id="restoreFile" type="file" accept=".json,application/json" onchange="restoreFullBackup(event)">
     <div id="backupMessage"></div>
   </div>
 
 </div>
 
+<!-- Modal for Big Photo Preview -->
+<div id="photoModal" class="modal hidden" onclick="closeModal()">
+  <img id="modalImg" src="">
+</div>
+
 <script>
 /* =========================================
-   GLOBAL VARIABLES & ELEMENTS
+   INDEXED-DB FOR PERMANENT STORAGE
+========================================= */
+let db;
+const DB_NAME = "MeriAtmakathaDB";
+const DB_VERSION = 1;
+
+function initDB(){
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = function(e){
+      const database = e.target.result;
+      if(!database.objectStoreNames.contains("chapters")){
+        database.createObjectStore("chapters", { keyPath: "id" });
+      }
+      if(!database.objectStoreNames.contains("photos")){
+        database.createObjectStore("photos", { keyPath: "id" });
+      }
+    };
+    request.onsuccess = function(e){
+      db = e.target.result;
+      resolve(db);
+    };
+    request.onerror = function(e){
+      reject(e);
+    };
+  });
+}
+
+/* =========================================
+   GLOBAL STATE
 ========================================= */
 let chapters = [];
+let photos = [];
+
 let recognition = null;
 let listening = false;
 let manuallyStopped = false;
 let lastFinalTranscript = "";
 let lastFinalTime = 0;
 
-const saveMessage = document.getElementById("saveMessage");
-const backupMessage = document.getElementById("backupMessage");
 const chapterTitle = document.getElementById("chapterTitle");
 const storyText = document.getElementById("storyText");
 const editingId = document.getElementById("editingId");
 const chapterList = document.getElementById("chapterList");
-const speedSlider = document.getElementById("ttsSpeed");
-const speedValue = document.getElementById("speedValue");
-const bookContainer = document.getElementById("bookContainer");
-const bookChapters = document.getElementById("bookChapters");
-
-speedSlider.addEventListener("input", function(){
-  speedValue.textContent = Number(this.value).toFixed(1);
-});
+const galleryContainer = document.getElementById("galleryContainer");
 
 function escapeHtml(text){
   if(!text) return "";
-  return String(text)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
+  return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 /* =========================================
-   DATA STORAGE (DIRECT ACCESS - LOCAL STORAGE)
+   LOAD DATA
 ========================================= */
-function loadChapters(){
-  try{
-    const stored = localStorage.getItem("meri_atmakatha_chapters");
-    chapters = stored ? JSON.parse(stored) : [];
-    renderChapters(chapters);
-  }catch(e){
-    console.error(e);
-    chapterList.innerHTML = '<div class="message error">डेटा लोड करने में त्रुटि हुई।</div>';
-  }
+async function loadAllData(){
+  await initDB();
+  loadChaptersFromDB();
+  loadPhotosFromDB();
 }
 
-function saveChaptersToStorage(){
-  localStorage.setItem("meri_atmakatha_chapters", JSON.stringify(chapters));
+function loadChaptersFromDB(){
+  const tx = db.transaction("chapters", "readonly");
+  const store = tx.objectStore("chapters");
+  const req = store.getAll();
+  req.onsuccess = function(){
+    chapters = req.result || [];
+    renderChapters(chapters);
+  };
+}
+
+function loadPhotosFromDB(){
+  const tx = db.transaction("photos", "readonly");
+  const store = tx.objectStore("photos");
+  const req = store.getAll();
+  req.onsuccess = function(){
+    photos = req.result || [];
+    renderPhotos(photos);
+  };
 }
 
 /* =========================================
-   SAVE / UPDATE CHAPTER
+   PHOTO GALLERY LOGIC
+========================================= */
+function addPhoto(){
+  const fileInput = document.getElementById("photoInput");
+  const captionInput = document.getElementById("photoCaption");
+  const msg = document.getElementById("galleryMsg");
+
+  if(!fileInput.files || fileInput.files.length === 0){
+    msg.innerHTML = '<div class="message error">कृपया पहले एक फ़ोटो चुनें।</div>';
+    return;
+  }
+
+  const file = fileInput.files[0];
+  const reader = new FileReader();
+
+  reader.onload = function(e){
+    const base64Data = e.target.result;
+    const newPhoto = {
+      id: "photo_" + Date.now(),
+      data: base64Data,
+      caption: captionInput.value.trim() || "यादगार पल",
+      date: new Date().toLocaleDateString('hi-IN')
+    };
+
+    const tx = db.transaction("photos", "readwrite");
+    const store = tx.objectStore("photos");
+    store.add(newPhoto);
+
+    tx.oncomplete = function(){
+      fileInput.value = "";
+      captionInput.value = "";
+      msg.innerHTML = '<div class="message success">तस्वीर गैलरी में सुरक्षित हो गई!</div>';
+      setTimeout(() => { msg.innerHTML = ""; }, 3000);
+      loadPhotosFromDB();
+    };
+  };
+
+  reader.readAsDataURL(file);
+}
+
+function renderPhotos(list){
+  if(!list || list.length === 0){
+    galleryContainer.innerHTML = '<p style="color:#777;grid-column:1/-1;">अभी गैलरी में कोई तस्वीर नहीं है।</p>';
+    return;
+  }
+
+  galleryContainer.innerHTML = list.map(item => `
+    <div class="gallery-item">
+      <button class="gallery-del-btn" title="डिलीट करें" onclick="deletePhoto('${item.id}')">✕</button>
+      <img src="${item.data}" alt="${escapeHtml(item.caption)}" onclick="openModal('${item.data}')">
+      <div class="gallery-caption">${escapeHtml(item.caption)}</div>
+      <div class="gallery-date">${item.date}</div>
+    </div>
+  `).join("");
+}
+
+function deletePhoto(id){
+  if(!confirm("क्या आप यह तस्वीर हटाना चाहते हैं?")) return;
+  const tx = db.transaction("photos", "readwrite");
+  tx.objectStore("photos").delete(id);
+  tx.oncomplete = function(){
+    loadPhotosFromDB();
+  };
+}
+
+function openModal(imgSrc){
+  document.getElementById("modalImg").src = imgSrc;
+  document.getElementById("photoModal").classList.remove("hidden");
+}
+
+function closeModal(){
+  document.getElementById("photoModal").classList.add("hidden");
+}
+
+/* =========================================
+   CHAPTERS LOGIC
 ========================================= */
 function saveChapter(){
   const title = chapterTitle.value.trim();
   const story = storyText.value.trim();
+  const msg = document.getElementById("saveMessage");
 
-  if(!title){
-    showSaveMessage("कृपया अध्याय का शीर्षक लिखें।", "error");
-    return;
-  }
-  if(!story){
-    showSaveMessage("कृपया कहानी लिखें या बोलकर लिखवाएँ।", "error");
+  if(!title || !story){
+    msg.innerHTML = '<div class="message error">शीर्षक और कहानी दोनों लिखें।</div>';
     return;
   }
 
   const editId = editingId.value.trim();
+  const tx = db.transaction("chapters", "readwrite");
+  const store = tx.objectStore("chapters");
 
   if(editId){
     const index = chapters.findIndex(c => c.id === editId);
@@ -428,30 +557,42 @@ function saveChapter(){
       chapters[index].title = title;
       chapters[index].story = story;
       chapters[index].updated = new Date().toISOString();
-      showSaveMessage("अध्याय सफलतापूर्वक अपडेट हो गया।", "success");
+      store.put(chapters[index]);
     }
   }else{
     const newChapter = {
       id: "ch_" + Date.now(),
       title: title,
       story: story,
-      created: new Date().toISOString(),
-      updated: new Date().toISOString()
+      created: new Date().toISOString()
     };
-    chapters.push(newChapter);
-    showSaveMessage("अध्याय सफलतापूर्वक सुरक्षित हो गया।", "success");
+    store.add(newChapter);
   }
 
-  saveChaptersToStorage();
-  clearEditor();
-  renderChapters(chapters);
+  tx.oncomplete = function(){
+    clearEditor();
+    msg.innerHTML = '<div class="message success">अध्याय सुरक्षित हो गया!</div>';
+    setTimeout(() => { msg.innerHTML = ""; }, 3000);
+    loadChaptersFromDB();
+  };
 }
 
-function showSaveMessage(message, type){
-  saveMessage.innerHTML = '<div class="message ' + (type || "") + '">' + escapeHtml(message) + '</div>';
-  setTimeout(function(){
-    saveMessage.innerHTML = "";
-  }, 4000);
+function renderChapters(list){
+  if(!list || list.length === 0){
+    chapterList.innerHTML = '<div class="message">अभी कोई अध्याय नहीं है। नया अध्याय लिखें।</div>';
+    return;
+  }
+  chapterList.innerHTML = list.map((chapter, index) => `
+    <div class="chapter">
+      <h3>अध्याय ${index + 1}: ${escapeHtml(chapter.title)}</h3>
+      <div class="story-preview">${escapeHtml(chapter.story)}</div>
+      <div class="no-print" style="margin-top:10px;">
+        <button onclick="editChapter('${chapter.id}')">✏️ Edit</button>
+        <button class="danger" onclick="deleteChapter('${chapter.id}')">🗑️ Delete</button>
+        <button onclick="speakText(${JSON.stringify(chapter.story)})">🔊 सुनें</button>
+      </div>
+    </div>
+  `).join("");
 }
 
 function clearEditor(){
@@ -461,86 +602,41 @@ function clearEditor(){
 }
 
 function editChapter(id){
-  const chapter = chapters.find(c => c.id === id);
-  if(!chapter) return;
-
-  chapterTitle.value = chapter.title || "";
-  storyText.value = chapter.story || "";
-  editingId.value = chapter.id;
-
-  window.scrollTo({
-    top: chapterTitle.offsetTop - 50,
-    behavior: "smooth"
-  });
+  const c = chapters.find(x => x.id === id);
+  if(!c) return;
+  chapterTitle.value = c.title;
+  storyText.value = c.story;
+  editingId.value = c.id;
+  window.scrollTo({ top: chapterTitle.offsetTop - 50, behavior: "smooth" });
 }
 
 function deleteChapter(id){
-  const yes = confirm("क्या आप यह अध्याय हटाना चाहते हैं?");
-  if(!yes) return;
-
-  chapters = chapters.filter(c => c.id !== id);
-  saveChaptersToStorage();
-  renderChapters(chapters);
+  if(!confirm("क्या आप यह अध्याय हटाना चाहते हैं?")) return;
+  const tx = db.transaction("chapters", "readwrite");
+  tx.objectStore("chapters").delete(id);
+  tx.oncomplete = () => loadChaptersFromDB();
 }
 
-/* =========================================
-   RENDER CHAPTERS
-========================================= */
-function renderChapters(list){
-  if(!list || list.length === 0){
-    chapterList.innerHTML = '<div class="message">अभी कोई अध्याय नहीं है। ऊपर पहला अध्याय लिखें।</div>';
-    return;
-  }
-
-  chapterList.innerHTML = list.map(function(chapter, index){
-    return `
-      <div class="chapter">
-        <h3>अध्याय ${index + 1}: ${escapeHtml(chapter.title || "बिना शीर्षक")}</h3>
-        <div class="story-preview">${escapeHtml(chapter.story || "")}</div>
-        <div class="no-print" style="margin-top:10px;">
-          <button onclick="editChapter('${chapter.id}')">✏️ Edit</button>
-          <button class="danger" onclick="deleteChapter('${chapter.id}')">🗑️ Delete</button>
-          <button onclick="speakText(${JSON.stringify(chapter.story || "")})">🔊 सुनें</button>
-        </div>
-      </div>
-    `;
-  }).join("");
-}
-
-/* =========================================
-   SEARCH CHAPTERS
-========================================= */
 function searchChapters(){
   const q = document.getElementById("searchBox").value.trim().toLowerCase();
-  if(!q){
-    renderChapters(chapters);
-    return;
-  }
-  const result = chapters.filter(function(chapter){
-    const title = String(chapter.title || "").toLowerCase();
-    const story = String(chapter.story || "").toLowerCase();
-    return title.includes(q) || story.includes(q);
-  });
-  renderChapters(result);
+  if(!q) return renderChapters(chapters);
+  renderChapters(chapters.filter(c => (c.title||"").toLowerCase().includes(q) || (c.story||"").toLowerCase().includes(q)));
 }
 
 /* =========================================
-   BOOK VIEW & PRINT
+   BOOK & PRINT
 ========================================= */
 function showBook(){
+  const bookContainer = document.getElementById("bookContainer");
+  const bookChapters = document.getElementById("bookChapters");
   if(bookContainer.classList.contains("hidden")){
-    if(chapters.length === 0){
-      alert("किताब में दिखाने के लिए कोई अध्याय नहीं है।");
-      return;
-    }
-    bookChapters.innerHTML = chapters.map(function(c, i){
-      return `
-        <div class="chapter">
-          <h2>अध्याय ${i + 1}: ${escapeHtml(c.title)}</h2>
-          <div class="story-preview">${escapeHtml(c.story)}</div>
-        </div>
-      `;
-    }).join("");
+    if(chapters.length === 0) return alert("दिखाने के लिए कोई अध्याय नहीं है।");
+    bookChapters.innerHTML = chapters.map((c, i) => `
+      <div class="chapter">
+        <h2>अध्याय ${i + 1}: ${escapeHtml(c.title)}</h2>
+        <div class="story-preview">${escapeHtml(c.story)}</div>
+      </div>
+    `).join("");
     bookContainer.classList.remove("hidden");
     window.scrollTo({ top: bookContainer.offsetTop, behavior: "smooth" });
   } else {
@@ -549,19 +645,7 @@ function showBook(){
 }
 
 function printBook(){
-  if(chapters.length === 0){
-    alert("प्रिंट करने के लिए कोई अध्याय नहीं है।");
-    return;
-  }
-  bookChapters.innerHTML = chapters.map(function(c, i){
-    return `
-      <div class="chapter">
-        <h2>अध्याय ${i + 1}: ${escapeHtml(c.title)}</h2>
-        <div class="story-preview">${escapeHtml(c.story)}</div>
-      </div>
-    `;
-  }).join("");
-  bookContainer.classList.remove("hidden");
+  showBook();
   window.print();
 }
 
@@ -570,71 +654,44 @@ function printBook(){
 ========================================= */
 function startVoice(){
   if(listening) return;
-
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SpeechRecognition){
-    alert("आपके ब्राउज़र में Voice-to-Text उपलब्ध नहीं है। Chrome ब्राउज़र का उपयोग करें।");
-    return;
-  }
-
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR) return alert("ब्राउज़र में Voice-to-Text सपोर्ट नहीं है।");
   manuallyStopped = false;
   if(!recognition){
-    recognition = new SpeechRecognition();
+    recognition = new SR();
     recognition.lang = "hi-IN";
     recognition.continuous = true;
     recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-
-    recognition.onstart = function(){
+    recognition.onstart = () => {
       listening = true;
       document.getElementById("startVoiceBtn").disabled = true;
       document.getElementById("stopVoiceBtn").disabled = false;
-      document.getElementById("voiceStatus").textContent = "🎤 सुन रहा हूँ... लगातार बोलते रहें।";
+      document.getElementById("voiceStatus").textContent = "🎤 सुन रहा हूँ... बोलिए।";
     };
-
-    recognition.onresult = function(event){
-      for(let i = event.resultIndex; i < event.results.length; i++){
-        if(!event.results[i].isFinal) continue;
-        let text = event.results[i][0].transcript.trim();
-        if(!text) continue;
-
-        const now = Date.now();
-        if(text === lastFinalTranscript && now - lastFinalTime < 6000) continue;
-        lastFinalTranscript = text;
-        lastFinalTime = now;
-
-        storyText.value = (storyText.value ? storyText.value + " " : "") + text;
+    recognition.onresult = (e) => {
+      for(let i = e.resultIndex; i < e.results.length; i++){
+        if(e.results[i].isFinal){
+          let text = e.results[i][0].transcript.trim();
+          storyText.value = (storyText.value ? storyText.value + " " : "") + text;
+        }
       }
     };
-
-    recognition.onerror = function(event){
-      console.log("Speech Error:", event.error);
-    };
-
-    recognition.onend = function(){
+    recognition.onend = () => {
       listening = false;
-      if(!manuallyStopped){
-        try{ recognition.start(); }catch(e){}
-      }else{
+      if(!manuallyStopped){ try{ recognition.start(); }catch(err){} }
+      else {
         document.getElementById("startVoiceBtn").disabled = false;
         document.getElementById("stopVoiceBtn").disabled = true;
         document.getElementById("voiceStatus").textContent = "माइक्रोफोन बंद है।";
       }
     };
   }
-
-  try{
-    recognition.start();
-  }catch(e){
-    console.error(e);
-  }
+  recognition.start();
 }
 
 function stopVoice(){
   manuallyStopped = true;
-  if(recognition && listening){
-    recognition.stop();
-  }
+  if(recognition && listening) recognition.stop();
   listening = false;
   document.getElementById("startVoiceBtn").disabled = false;
   document.getElementById("stopVoiceBtn").disabled = true;
@@ -642,77 +699,80 @@ function stopVoice(){
 }
 
 /* =========================================
-   TEXT TO SPEECH (आवाज़ में सुनें)
+   TEXT TO SPEECH
 ========================================= */
 function speakText(text){
-  if(!('speechSynthesis' in window)){
-    alert("आपके ब्राउज़र में Text-to-Speech उपलब्ध नहीं है।");
-    return;
-  }
+  if(!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
-  if(!text) return;
-
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = document.getElementById("ttsLanguage").value || "hi-IN";
-  utterance.rate = parseFloat(document.getElementById("ttsSpeed").value) || 1.0;
-  window.speechSynthesis.speak(utterance);
+  const ut = new SpeechSynthesisUtterance(text);
+  ut.lang = document.getElementById("ttsLanguage").value || "hi-IN";
+  ut.rate = parseFloat(document.getElementById("ttsSpeed").value) || 1.0;
+  window.speechSynthesis.speak(ut);
 }
 
 function speakStory(){
-  const text = storyText.value.trim();
-  if(!text){
-    alert("सुनाने के लिए कोई कहानी नहीं है। टेक्स्ट बॉक्स में लिखें।");
-    return;
-  }
-  speakText(text);
+  const t = storyText.value.trim();
+  if(!t) return alert("सुनाने के लिए कोई टेक्स्ट नहीं है।");
+  speakText(t);
 }
 
 function stopSpeaking(){
-  if('speechSynthesis' in window){
-    window.speechSynthesis.cancel();
-  }
+  if('speechSynthesis' in window) window.speechSynthesis.cancel();
 }
 
 /* =========================================
-   BACKUP & RESTORE
+   FULL BACKUP & RESTORE (PHOTOS + TEXT)
 ========================================= */
-function downloadBackup(){
-  if(chapters.length === 0){
-    alert("डाउनलोड करने के लिए कोई अध्याय नहीं है।");
-    return;
-  }
-  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(chapters, null, 2));
-  const dlAnchorElem = document.createElement('a');
-  dlAnchorElem.setAttribute("href", dataStr);
-  dlAnchorElem.setAttribute("download", "Meri_Atmakatha_Backup.json");
-  dlAnchorElem.click();
+function downloadFullBackup(){
+  const fullData = {
+    chapters: chapters,
+    photos: photos,
+    exportDate: new Date().toISOString()
+  };
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(fullData));
+  const dlAnchor = document.createElement('a');
+  dlAnchor.setAttribute("href", dataStr);
+  dlAnchor.setAttribute("download", "Meri_Atmakatha_Full_Backup.json");
+  dlAnchor.click();
 }
 
-function restoreBackup(event){
+function restoreFullBackup(event){
   const file = event.target.files[0];
+  const msg = document.getElementById("backupMessage");
   if(!file) return;
 
   const reader = new FileReader();
-  reader.onload = function(e){
+  reader.onload = async function(e){
     try{
-      const importedChapters = JSON.parse(e.target.result);
-      if(Array.isArray(importedChapters)){
-        chapters = importedChapters;
-        saveChaptersToStorage();
-        renderChapters(chapters);
-        backupMessage.innerHTML = '<div class="message success">बैकअप सफलतापूर्वक लोड हो गया!</div>';
-      }else{
-        throw new Error("फ़ाइल का प्रारूप सही नहीं है।");
+      const imported = JSON.parse(e.target.result);
+      if(imported.chapters || imported.photos){
+        const txCh = db.transaction("chapters", "readwrite");
+        const storeCh = txCh.objectStore("chapters");
+        storeCh.clear();
+        (imported.chapters || []).forEach(c => storeCh.add(c));
+
+        const txPh = db.transaction("photos", "readwrite");
+        const storePh = txPh.objectStore("photos");
+        storePh.clear();
+        (imported.photos || []).forEach(p => storePh.add(p));
+
+        msg.innerHTML = '<div class="message success">संपूर्ण बैकअप (तस्वीरें + कहानियाँ) सफलतापूर्वक लोड हो गया!</div>';
+        setTimeout(() => { location.reload(); }, 1500);
+      } else {
+        throw new Error("फ़ाइल फ़ॉर्मेट सही नहीं है।");
       }
     }catch(err){
-      backupMessage.innerHTML = '<div class="message error">फ़ाइल लोड करने में समस्या: ' + err.message + '</div>';
+      msg.innerHTML = '<div class="message error">फ़ाइल लोड नहीं हुई: ' + err.message + '</div>';
     }
   };
   reader.readAsText(file);
 }
 
-// पेज लोड होते ही सीधे अध्याय लोड करें
-window.addEventListener("DOMContentLoaded", loadChapters);
+document.getElementById("ttsSpeed").addEventListener("input", function(){
+  document.getElementById("speedValue").textContent = Number(this.value).toFixed(1);
+});
+
+window.addEventListener("DOMContentLoaded", loadAllData);
 </script>
 
 </body>
